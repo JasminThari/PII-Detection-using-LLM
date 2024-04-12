@@ -58,7 +58,7 @@ data_dict = dataset['train'].train_test_split(test_size=0.1)
  
 
 #reduce size of both train, validation and test datasets
-data_size = 100
+data_size = None
 
 if data_size is not None:
     data_dict["train"] = data_dict["train"].select(range(data_size))
@@ -74,7 +74,9 @@ tokenizer = AutoTokenizer.from_pretrained("distilbert/distilbert-base-uncased") 
 # function that tokenizes according the chosen model and aligns the labels with the new tokens
 
 def tokenize_and_align_labels(examples):
-    tokenized_inputs = tokenizer(examples["tokens"], truncation=True, is_split_into_words=True)
+    #tokenized_inputs = tokenizer(examples["tokens"], truncation=True, is_split_into_words=True)
+    tokenized_inputs = tokenizer(examples["tokens"], truncation=True, is_split_into_words=True, padding=True, max_length=512)
+
 
     labels = []
     for i, label in enumerate(examples[f"labels_int"]):
@@ -91,7 +93,8 @@ def tokenize_and_align_labels(examples):
             previous_word_idx = word_idx
         labels.append(label_ids)
 
-    tokenized_inputs["transformed_labels"] = labels
+    #tokenized_inputs["transformed_labels"] = labels
+    tokenized_inputs["labels"] = labels
     return tokenized_inputs
 
 tokenized_data_dict = data_dict.map(tokenize_and_align_labels, batched=True)
@@ -133,13 +136,13 @@ training_args = TrainingArguments(
     learning_rate=2e-5,
     per_device_train_batch_size=16,
     per_device_eval_batch_size=16,
-    num_train_epochs=1,
+    num_train_epochs=100,
     weight_decay=0.01,
-    evaluation_strategy="epoch",
-    save_strategy="epoch",
+    evaluation_strategy="no",
+    save_strategy="no",
     load_best_model_at_end=True,
     push_to_hub=False,
-    save_steps=1000,
+    #save_steps=None,
 )
 
 # define the trainer

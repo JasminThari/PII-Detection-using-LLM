@@ -162,4 +162,5 @@ cython_debug/
 # ignore the data folder
 data/
 .vscode/
+saved_model/
 ```
