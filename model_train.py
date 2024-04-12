@@ -1,5 +1,7 @@
-# print the python version to console
 import sys
+import json
+import pandas as pd
+
 from datasets import load_dataset
 from transformers import (AutoTokenizer, 
                           AutoModelForTokenClassification, 
@@ -11,10 +13,6 @@ import evaluate
 import torch
 import numpy as np
 
-#reduce size of both train, validation and test datasets
-data_size = 10
-
-
 #cuda test
 if torch.cuda.is_available():
     device = torch.device('cuda')
@@ -24,18 +22,52 @@ else:
     print('No GPU available, using the CPU instead.')
     device = torch.device('cpu')
 
-# Load the dummy dataset.
-# here it dict with train, validation and test datasets
-wnut = load_dataset("wnut_17")
-# reduce teh size of the trian dataset
+# Path to your JSON file
+path_to_json = "data/train.json"
+
+# Load the dataset
+dataset = load_dataset('json', data_files={'train': path_to_json})
+
+# use the following dictionary to map strings to integers
+label2id = {
+    "O": 0,
+    "B-NAME_STUDENT": 1,
+    "I-NAME_STUDENT": 2,
+    "B-ID_NUM": 3,
+    "I-ID_NUM": 4,
+    "B-PHONE_NUM": 5,
+    "I-PHONE_NUM": 6,
+    "B-EMAIL": 7,
+    "I-EMAIL": 8,
+    "B-URL_PERSONAL": 9,
+    "I-URL_PERSONAL": 10,
+    "B-STREET_ADDRESS": 11,
+    "I-STREET_ADDRESS": 12,
+    "B-USERNAME": 13,
+    "I-USERNAME": 14,
+}
+
+# reverse the dictionary label2id
+id2label = {v: k for k, v in label2id.items()}
+
+# use the dict to map the strings to integers
+dataset = dataset.map(lambda x: {'labels_int': [label2id[i] for i in x['labels']]})
+
+# Split the dataset into a training, validation and test dataset
+data_dict = dataset['train'].train_test_split(test_size=0.1)
+ 
+
+#reduce size of both train, validation and test datasets
+data_size = 100
 
 if data_size is not None:
-    wnut["train"] = wnut["train"].select(range(data_size))
-    wnut["validation"] = wnut["validation"].select(range(data_size))
-    wnut["test"] = wnut["test"].select(range(data_size))
+    data_dict["train"] = data_dict["train"].select(range(data_size))
+    #data_dict["validation"] = data_dict["validation"].select(range(data_size))
+    data_dict["test"] = data_dict["test"].select(range(data_size))
+
 
 # find the labels
-label_list = wnut["train"].features["ner_tags"].feature.names
+#label_list = wnut["train"].features["ner_tags"].feature.names
 
 tokenizer = AutoTokenizer.from_pretrained("distilbert/distilbert-base-uncased") # might be better to used the cased once, since we are doin NER
 
@@ -45,7 +77,7 @@ def tokenize_and_align_labels(examples):
     tokenized_inputs = tokenizer(examples["tokens"], truncation=True, is_split_into_words=True)
 
     labels = []
-    for i, label in enumerate(examples[f"ner_tags"]):
+    for i, label in enumerate(examples[f"labels_int"]):
         word_ids = tokenized_inputs.word_ids(batch_index=i)  # Map tokens to their respective word.
         previous_word_idx = None
         label_ids = []
@@ -59,18 +91,16 @@ def tokenize_and_align_labels(examples):
             previous_word_idx = word_idx
         labels.append(label_ids)
 
-    tokenized_inputs["labels"] = labels
+    tokenized_inputs["transformed_labels"] = labels
     return tokenized_inputs
 
-tokenized_wnut = wnut.map(tokenize_and_align_labels, batched=True)
-
+tokenized_data_dict = data_dict.map(tokenize_and_align_labels, batched=True)
 
 data_collator = DataCollatorForTokenClassification(tokenizer=tokenizer)
 
 seqeval = evaluate.load("seqeval")
 
-#labels = [label_list[i] for i in example[f"ner_tags"]]
-
+label_list = list(label2id.keys())
 
 def compute_metrics(p):
     predictions, labels = p
@@ -92,50 +122,18 @@ def compute_metrics(p):
         "f1": results["overall_f1"],
         "accuracy": results["overall_accuracy"],
     }
-
-id2label = {
-    0: "O",
-    1: "B-corporation",
-    2: "I-corporation",
-    3: "B-creative-work",
-    4: "I-creative-work",
-    5: "B-group",
-    6: "I-group",
-    7: "B-location",
-    8: "I-location",
-    9: "B-person",
-    10: "I-person",
-    11: "B-product",
-    12: "I-product",
-}
-label2id = {
-    "O": 0,
-    "B-corporation": 1,
-    "I-corporation": 2,
-    "B-creative-work": 3,
-    "I-creative-work": 4,
-    "B-group": 5,
-    "I-group": 6,
-    "B-location": 7,
-    "I-location": 8,
-    "B-person": 9,
-    "I-person": 10,
-    "B-product": 11,
-    "I-product": 12,
-}    
-
 model = AutoModelForTokenClassification.from_pretrained(
-    "distilbert/distilbert-base-uncased", num_labels=13, id2label=id2label, label2id=label2id)
+    "distilbert/distilbert-base-uncased", num_labels=len(label2id.keys()), id2label=id2label, label2id=label2id)
 # move the model to the device
 model.to(device)
 
 # define the training arguments
 training_args = TrainingArguments(
-    output_dir="my_awesome_wnut_model",
+    output_dir="ner_pii_model",
     learning_rate=2e-5,
     per_device_train_batch_size=16,
     per_device_eval_batch_size=16,
-    num_train_epochs=10,
+    num_train_epochs=1,
     weight_decay=0.01,
     evaluation_strategy="epoch",
     save_strategy="epoch",
@@ -149,8 +147,8 @@ trainer = Trainer(
     model=model,
     args=training_args,
     data_collator=data_collator,
-    train_dataset=wnut["train"].map(tokenize_and_align_labels, batched=True),
-    eval_dataset=wnut["validation"].map(tokenize_and_align_labels, batched=True),
+    train_dataset=data_dict["train"].map(tokenize_and_align_labels, batched=True),
+    eval_dataset=data_dict["test"].map(tokenize_and_align_labels, batched=True),
     tokenizer=tokenizer,
     compute_metrics=compute_metrics,
 )
@@ -159,12 +157,6 @@ trainer.train()
 
 # save the model
 model.save_pretrained("saved_model")
-
-
-
-#text = "The Golden State Warriors are an American professional basketball team based in San Francisco."
-
-
 
 
 
