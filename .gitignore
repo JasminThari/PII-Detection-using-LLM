@@ -163,4 +163,5 @@ cython_debug/
 data/
 .vscode/
 saved_model/
+pre_trained_model/
 ```
