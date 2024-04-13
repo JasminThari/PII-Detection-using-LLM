@@ -1,5 +1,6 @@
 import sys
 import json
+import os
 import pandas as pd
 
 from datasets import load_dataset
@@ -58,7 +59,7 @@ data_dict = dataset['train'].train_test_split(test_size=0.1)
  
 
 #reduce size of both train, validation and test datasets
-data_size = None
+data_size = 20
 
 if data_size is not None:
     data_dict["train"] = data_dict["train"].select(range(data_size))
@@ -130,19 +131,27 @@ model = AutoModelForTokenClassification.from_pretrained(
 # move the model to the device
 model.to(device)
 
+# make a folder to save the model in
+model_name = "ner_pii_model"
+os.makedirs("work3/s204090/", exist_ok=True)
+
+dir_to_save_model = "work3/s204090"
+
+output_dir = os.path.join(dir_to_save_model, model_name)
+
 # define the training arguments
 training_args = TrainingArguments(
-    output_dir="ner_pii_model",
+    output_dir=output_dir,
     learning_rate=2e-5,
     per_device_train_batch_size=16,
     per_device_eval_batch_size=16,
-    num_train_epochs=100,
+    num_train_epochs=5,
     weight_decay=0.01,
-    evaluation_strategy="no",
-    save_strategy="no",
+    evaluation_strategy="epoch",
+    save_strategy="epoch",
     load_best_model_at_end=True,
     push_to_hub=False,
-    #save_steps=None,
+    save_steps=1000,
 )
 
 # define the trainer
@@ -159,7 +168,7 @@ trainer = Trainer(
 trainer.train()
 
 # save the model
-model.save_pretrained("saved_model")
+model.save_pretrained(os.path.join(dir_to_save_model, "saved_model"))
 
 
 
