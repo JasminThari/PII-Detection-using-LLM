@@ -13,6 +13,7 @@ from transformers import (AutoTokenizer,
 import evaluate
 import torch
 import numpy as np
+import datetime
 
 #cuda test
 if torch.cuda.is_available():
@@ -23,6 +24,14 @@ else:
     print('No GPU available, using the CPU instead.')
     device = torch.device('cpu')
 
+#create a folder to save trainied models, if it doesn't exist
+os.makedirs("trained_models", exist_ok=True)
+# get current time
+current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+output_dir = os.path.join("trained_models", current_time)
+# make a folder with the current time in the trained_models folder
+os.makedirs(output_dir, exist_ok=True)
+   
 # Path to your JSON file
 path_to_json = "data/train.json"
 
@@ -59,7 +68,7 @@ data_dict = dataset['train'].train_test_split(test_size=0.1)
  
 
 #reduce size of both train, validation and test datasets
-data_size = 20
+data_size = None
 
 if data_size is not None:
     data_dict["train"] = data_dict["train"].select(range(data_size))
@@ -98,7 +107,8 @@ def tokenize_and_align_labels(examples):
     tokenized_inputs["labels"] = labels
     return tokenized_inputs
 
-tokenized_data_dict = data_dict.map(tokenize_and_align_labels, batched=True)
+# we do not need to do this here, is done in the trainer
+#tokenized_data_dict = data_dict.map(tokenize_and_align_labels, batched=True)
 
 data_collator = DataCollatorForTokenClassification(tokenizer=tokenizer)
 
@@ -132,27 +142,29 @@ model = AutoModelForTokenClassification.from_pretrained(
 model.to(device)
 
 # make a folder to save the model in
-model_name = "ner_pii_model"
-os.makedirs("work3/s204090/", exist_ok=True)
+#model_name = "ner_pii_model"
+#os.makedirs("work3/s204090/", exist_ok=True)
 
-dir_to_save_model = "work3/s204090"
+#dir_to_save_model = "work3/s204090"
 
-output_dir = os.path.join(dir_to_save_model, model_name)
+#output_dir = os.path.join(dir_to_save_model, model_name)
 
 # define the training arguments
 training_args = TrainingArguments(
     output_dir=output_dir,
     learning_rate=2e-5,
-    per_device_train_batch_size=16,
-    per_device_eval_batch_size=16,
-    num_train_epochs=5,
+    per_device_train_batch_size=32, # 32 works on 32gb gpu and so does 64, chech hugginface for model usage
+    per_device_eval_batch_size=32,
+    num_train_epochs=50,
+    #num_train_epochs=25,
     weight_decay=0.01,
     evaluation_strategy="epoch",
     save_strategy="epoch",
+    save_total_limit=2, # limit the total amount of checkpoints, it will delete the older checkpoints
     load_best_model_at_end=True,
-    push_to_hub=False,
-    save_steps=1000,
-)
+    push_to_hub=False
+    #save_steps=1000,
+                        )
 
 # define the trainer
 trainer = Trainer(
@@ -168,7 +180,7 @@ trainer = Trainer(
 trainer.train()
 
 # save the model
-model.save_pretrained(os.path.join(dir_to_save_model, "saved_model"))
+model.save_pretrained(os.path.join(output_dir, "best_model"))
 
 
 

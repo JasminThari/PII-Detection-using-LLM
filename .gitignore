@@ -162,6 +162,7 @@ cython_debug/
 # ignore the data folder
 data/
 .vscode/
-saved_model/
-pre_trained_model/
+PII_env/
+HPC_logs/
+trained_models/
 ```
