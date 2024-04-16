@@ -1,0 +1,10 @@
+#debug config
+data_prep: 
+  df_path: data/debug_data.json
+  test_size: 0.2
+  random_state: 42
+  use_LLM_data_train: False
+  use_LLM_data_test: False
+  use_cased_model: False
+  max_length: 512
+  chunk_data: False
