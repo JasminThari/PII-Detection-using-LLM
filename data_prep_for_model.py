@@ -4,12 +4,13 @@ import os
 import pandas as pd
 from omegaconf import OmegaConf
 
-from datasets import load_dataset
+from datasets import load_dataset,concatenate_datasets
 from transformers import (AutoTokenizer, 
                           AutoModelForTokenClassification, 
                           DataCollatorForTokenClassification, 
                           TrainingArguments, 
                           Trainer,
+                          
                           pipeline)
 import evaluate
 import torch
@@ -51,12 +52,13 @@ def splitData(dataset_dict,**kwargs):
     dataset_dict["test"] = train_test['test']
     # add LLM data to train data based on the flag
     if kwargs['use_LLM_data_train']:
-        dataset_dict['train'] = dataset_dict['train'].concatenate(dataset_dict['LLM_data'])  
+        dataset_dict['train'] = concatenate_datasets([dataset_dict['train'], dataset_dict['LLM_data']])
+        
     # assert check if test and train data are disjoint
     # remove unnecessary keys / data sets       
     dataset_dict.pop("orginal_data")
     dataset_dict.pop("LLM_data")
-    dataset_dict = addIntLabels(dataset_dict)
+    dataset_dict = dataset_dict.map(lambda x: {'labels_int': [kwargs["label2id"][i] for i in x['labels']]}) 
     return dataset_dict
 
 def addIntLabels(dataset_dict):
@@ -127,29 +129,34 @@ def create_debug_data(df_path):
     result.to_json('data/debug_data.json', orient='records', lines=True)
 
 
-
-def prepData(config_path):
-    config = OmegaConf.load(config_path)
+def prepData(config,model_path="non_trained_model"):
+    #config = OmegaConf.load(config_path)
     args = config.data_prep    
     dataset_dict = load_dataset('json', data_files={'all_data': args.df_path})
-    dataset_dict = splitData(dataset_dict, test_size=args.test_size, random_state=args.random_state, use_LLM_data_train=args.use_LLM_data_train)
+    dataset_dict = splitData(dataset_dict, test_size=args.test_size, random_state=args.random_state, use_LLM_data_train=args.use_LLM_data_train, label2id=args.label2id)
     # load the tokenizer
-    if args.use_cased_model:
-        tokenizer = AutoTokenizer.from_pretrained("distilbert-base-cased")
-    else:
-        tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
+    tokenizer = AutoTokenizer.from_pretrained(config.model_name)      
     # tokenize and align the labels
     dataset_dict = dataset_dict.map(tokenize_and_align_labels,fn_kwargs={'tokenizer':tokenizer, 'chunk_data':args.chunk_data, 'max_length':args.max_length}, batched=True)
     
     # if chunk data is True, chunk the data
     if args.chunk_data:
         raise NotImplementedError("chunking the data is not implemented yet")
+    
+    # split training into train and validation
+    train_val = dataset_dict["train"].train_test_split(test_size=args.val_size, shuffle=True, seed=args.random_state)
+    # update the dataset_dict with the train and test data
+    dataset_dict["train"] = train_val['train']
+    dataset_dict["validation"] = train_val['test']
+
     # save the tokenized data
-    config_name = os.path.basename(config_path).split('.')[0]
+    #config_name = os.path.basename(config_path).split('.')[0]
     # make a folder to save the tokenized data
-    dir_name = f'trained_models/{config_name}'
+    dir_name = f'trained_models/{config.name}/{model_path}'
     os.makedirs(dir_name, exist_ok=True)
-    dataset_dict.save_to_disk(os.path.join(dir_name, 'tokenized_data')) 
+    dataset_dict.save_to_disk(os.path.join(dir_name, 'tokenized_data'))
+    # also save the config file
+    OmegaConf.save(config, os.path.join(dir_name, 'used_config.yaml')) 
  
 # #make if main statement
 if __name__ == '__main__':
@@ -158,7 +165,8 @@ if __name__ == '__main__':
     if args.config_path is None:
         print("Please provide a path to the config file")
         sys.exit(1)
-    prepData(args.config_path)
+    config = OmegaConf.load(args.config_path)
+    prepData(config)
     
 
 

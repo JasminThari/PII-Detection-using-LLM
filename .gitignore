@@ -164,5 +164,7 @@ data/
 .vscode/
 PII_env/
 HPC_logs/
+HPC_submit_scripts/
 trained_models/
+
 ```
