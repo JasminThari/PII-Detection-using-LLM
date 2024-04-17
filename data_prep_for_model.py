@@ -157,6 +157,7 @@ def prepData(config,model_path="non_trained_model"):
     dataset_dict.save_to_disk(os.path.join(dir_name, 'tokenized_data'))
     # also save the config file
     OmegaConf.save(config, os.path.join(dir_name, 'used_config.yaml')) 
+    return dataset_dict
  
 # #make if main statement
 if __name__ == '__main__':
@@ -166,7 +167,7 @@ if __name__ == '__main__':
         print("Please provide a path to the config file")
         sys.exit(1)
     config = OmegaConf.load(args.config_path)
-    prepData(config)
+    dataset_dict = prepData(config)
     
 
 

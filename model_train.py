@@ -41,7 +41,8 @@ if __name__ == "__main__":
     #os.makedirs(output_dir, exist_ok=True)
     # prepdata will save the tokenized data in the correct folder.
     # it will also save a copy of the config file in the same folder
-    prepData(config,model_path=current_time)
+    print("I am in the new script")
+    data_dict = prepData(config,model_path=current_time)
 
     # now we can train the model
     tokenizer = AutoTokenizer.from_pretrained(config.model_name) 
@@ -84,8 +85,11 @@ if __name__ == "__main__":
     training_args = TrainingArguments(
         output_dir=output_dir,**config.training_args)
     
+        # sleep for 5 min
+    #import time
+    #time.sleep(300)
     # load the tokenized data
-    data_dict = load_dataset('json', data_files=os.path.join(output_dir, 'tokenized_data'))
+    #data_dict = load_dataset('json', data_files=os.path.join(output_dir, 'tokenized_data'))
     # define the trainer
  
     trainer = Trainer(
