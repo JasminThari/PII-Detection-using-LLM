@@ -1,6 +1,7 @@
-from IPython.display import HTML
+from IPython.display import display, HTML
 import spacy
 from spacy.lang.en import English
+from spacy import displacy
 spacy_nlp = spacy.load('en_core_web_sm')
 eng_tokenizer = English().tokenizer
 
@@ -89,10 +90,77 @@ def visualize_ner(row):
                 </style>
                 """
 
-    options = {"colors": {"NAME_STUDENT": "#748CAB", "URL_PERSONAL": "#FFFC31", 
-                        "ID_NUM": "#E94F37", "EMAIL": "#F8B195", "STREET_ADDRESS": "#BDBF09", "PHONE_NUM": "#D96C06", "USERNAME": "#2292A4"}}
+    options = {"colors": {"B-NAME": "#748CAB", "URL_PERSONAL": "#FFFC31", "ID_NUM": "#E94F37", "B-EMAIL": "#F8B195", "I-EMAIL": "#F8B195", "B-STREET_ADDRESS": "#BDBF09", "I-STREET_ADDRESS": "#CDADE6", "B-PHONE_NUM": "#BD8A3D",
+                           "I-PHONE_NUM": "#D96C06", "USERNAME": "#2292A4"}}
 
     # Inject custom CSS
     display(HTML(custom_css))
 
     spacy.displacy.render(ex, style="ent", manual=True, jupyter=True, options=options)
+
+def visualize_ner_pred_text(text, text_labels):
+    # CSS for visual enhancement in displaCy
+    custom_css = """
+    <style>    
+        /* Customizing entity appearance */
+        .entities {
+            font-size: 11px !important;
+            font-family: Verdana !important;
+            line-height: 1.25 !important;
+            border-radius: 10px !important; /* Rounded corners */
+            background-color: #f9f9f9 !important; /* Very light gray background */
+            padding: 20px 15px !important; /* Adjust padding */
+        }
+        /* Customizing entity appearance */
+        .entity {
+            font-size: 10px !important;
+            padding: 0.2em 0.4em !important;
+            font-family: Verdana !important;
+            font-weight: bold !important;
+            color: black !important; /* Ensuring text in entities is black */
+        }
+        /* Overriding default styling for non-entity text */
+        .entities .entity:not([style]), .entities span:not(.entity) {
+            color: black !important; /* Making non-entity text black */
+        }
+    </style>
+    """
+
+    # Entity colors
+    options = {"colors": {"B-NAME": "#748CAB", "URL_PERSONAL": "#FFFC31", "ID_NUM": "#E94F37", "B-EMAIL": "#F8B195", "STREET_ADDRESS": "#BDBF09", "I-PHONE_NUM": "#D96C06", "USERNAME": "#2292A4"}}
+
+    # '#57634B', '#D4793A', '#527184'],  
+    # 'four_colors': ['#85977D', '#8498A5', '#587F86', '#BD8A3D'],  
+    # 'five_colors': ['#57634B', '#D4793A', '#527184', '#CFA802', '#BBB599'], 
+    # 'twelve_colors': ['#57634B', '#85977D', '#8498A5', '#527184', '#E9B649', '#BD8A3D', '#D4793A', 
+    #                   '#7D1F1D', '#BB6D71', '#BBB599', '#BE477D', '#CDADE6'
+
+    # Display the custom CSS
+    display(HTML(custom_css))
+
+    # Load a spaCy model
+    nlp = spacy.load('en_core_web_sm')
+
+    # Process the text using spaCy to get a doc
+    doc = nlp(text)
+
+    # Set the entities manually
+    entities = []
+    last_end = 0
+    for text_label, entity_label in text_labels:
+        if entity_label != "O":
+            start = doc.text.find(text_label, last_end)
+            if start == -1:  # If the label is not found beyond last end
+                continue
+            end = start + len(text_label)
+            span = doc.char_span(start, end, label=entity_label)
+            if span is not None:
+                entities.append(span)
+                last_end = end  # Update last_end to be the end of the current span
+
+    # Setting the custom entities
+    doc.ents = entities
+
+    # Use displaCy to render the document with custom settings
+    html = displacy.render(doc, style="ent", options=options)
+    display(HTML(html))
