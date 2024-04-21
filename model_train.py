@@ -84,23 +84,57 @@ if __name__ == "__main__":
     output_dir = os.path.join("trained_models",config.name,current_time)
     training_args = TrainingArguments(
         output_dir=output_dir,**config.training_args)
-    
-        # sleep for 5 min
-    #import time
-    #time.sleep(300)
-    # load the tokenized data
-    #data_dict = load_dataset('json', data_files=os.path.join(output_dir, 'tokenized_data'))
-    # define the trainer
+
+    if config.weighted_loss:
+        # find the label distrubution in the training data
+        label_distribution = {}
+        for i in range(len(data_dict["train"])):
+            for label in data_dict["train"]["labels"][i]:
+                if label == -100:
+                    continue
+                elif label in label_distribution:
+                    label_distribution[label] += 1
+                else:
+                    label_distribution[label] = 1
+
+        num_total_labels = sum(label_distribution.values()) 
+        
+        weight_tensor = torch.tensor([label_distribution[i]/num_total_labels if label_distribution.get(i) else 0 for i in range(len(label_list))], device=device)
+
+        #class to use if the weighted loss function is chosen
+        class WeightedLossTrainer(Trainer):
+            def compute_loss(self, model, inputs, return_outputs=False):
+                labels = inputs.pop("labels")
+                outputs = model(**inputs)
+                logits = outputs.logits
+                loss_fct = torch.nn.CrossEntropyLoss(weight=weight_tensor, ignore_index=-100)
+                loss = loss_fct(logits.view(-1, self.model.config.num_labels), labels.view(-1))
+                return (loss, outputs) if return_outputs else loss
+
+        trainer = WeightedLossTrainer(
+            model=model,
+            args=training_args,
+            data_collator=data_collator,
+            train_dataset=data_dict["train"],
+            eval_dataset=data_dict["validation"],
+            tokenizer=tokenizer,
+            compute_metrics=compute_metrics,            
+        )
+
+    else:
  
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        data_collator=data_collator,
-        train_dataset=data_dict["train"],
-        eval_dataset=data_dict["validation"],
-        tokenizer=tokenizer,
-        compute_metrics=compute_metrics,
-    )
+        trainer = Trainer(
+            model=model,
+            args=training_args,
+            data_collator=data_collator,
+            train_dataset=data_dict["train"],
+            eval_dataset=data_dict["validation"],
+            tokenizer=tokenizer,
+            compute_metrics=compute_metrics,
+            
+            
+        )
+
     trainer.train()
 
     # save the model
