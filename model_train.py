@@ -15,6 +15,7 @@ import evaluate
 import torch
 import numpy as np
 import datetime
+from tqdm import tqdm 
 
 from data_prep_for_model import parse_command_line_arguments, prepData
 
@@ -87,20 +88,14 @@ if __name__ == "__main__":
 
     if config.weighted_loss:
         # find the label distrubution in the training data
-        label_distribution = {}
-        for i in range(len(data_dict["train"])):
-            for label in data_dict["train"]["labels"][i]:
-                if label == -100:
-                    continue
-                elif label in label_distribution:
-                    label_distribution[label] += 1
-                else:
-                    label_distribution[label] = 1
-
-        num_total_labels = sum(label_distribution.values()) 
-        
-        weight_tensor = torch.tensor([label_distribution[i]/num_total_labels if label_distribution.get(i) else 0 for i in range(len(label_list))], device=device)
-
+        train_labels = torch.tensor(data_dict["train"]["labels"]).to(device)
+        label_distribution = torch.bincount(train_labels[train_labels >= 0].flatten(), minlength=len(label_list))
+        num_total_labels = label_distribution.sum()
+        # create the weight tensor
+        weight_tensor = 1 / label_distribution.float() #potential division by zero leaing to inf values
+        # replace the infinities with a small number
+        weight_tensor[weight_tensor == float("inf")] = 1e-8   
+  
         #class to use if the weighted loss function is chosen
         class WeightedLossTrainer(Trainer):
             def compute_loss(self, model, inputs, return_outputs=False):

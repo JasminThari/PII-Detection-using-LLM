@@ -1,6 +1,6 @@
-name: config_debug
-model_name: "distilbert/distilbert-base-uncased"
-#model_name: "distilbert/distilbert-base-cased"
+name: config_weighted_cased
+#model_name: "distilbert/distilbert-base-uncased"
+model_name: "distilbert/distilbert-base-cased"
 weighted_loss: True
 
 training_args: 
@@ -16,13 +16,13 @@ training_args:
   push_to_hub: False
 
 data_prep: 
-  df_path: data/debug_data.json
+  df_path: data/data_df.json
   test_size: 0.2
   val_size: 0.2
   random_state: 42
   use_LLM_data_train: True
   use_LLM_data_test: False
-  use_cased_model: False
+  use_cased_model: True
   max_length: 512
   chunk_data: False
   #tokenizer_name: "${self:model}" #this is not used

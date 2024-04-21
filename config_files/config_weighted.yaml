@@ -28,8 +28,8 @@ data_prep:
   #tokenizer_name: "${self:model}" #this is not used
   label2id:  {
     "O": 0,
-    "B-NAME": 1,
-    "I-NAME": 2,
+    "B-NAME_STUDENT": 1,
+    "I-NAME_STUDENT": 2,
     "B-ID_NUM": 3,
     "I-ID_NUM": 4,
     "B-PHONE_NUM": 5,
