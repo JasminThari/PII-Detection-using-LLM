@@ -161,10 +161,18 @@ cython_debug/
 
 # ignore the data folder
 data/
+<<<<<<< HEAD
 .vscode/
 PII_env/
 HPC_logs/
 HPC_submit_scripts/
 trained_models/
+=======
+pre_trained_model/
+test_data/
+trained_model_cased/
+trained_model_uncased/
+combined_data.json
+>>>>>>> origin/jth
 
 ```

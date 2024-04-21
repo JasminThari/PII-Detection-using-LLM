@@ -137,7 +137,15 @@ def preprocess_texts(data_df):
 
     return processed_texts
 
-
+def aggregate_tfidf_scores(tfidf_documents):
+    combined_tfidf = {}
+    for doc in tfidf_documents:
+        for word, score in doc.items():
+            if word in combined_tfidf:
+                combined_tfidf[word] += score
+            else:
+                combined_tfidf[word] = score
+    return combined_tfidf
 
 def plot_wordcloud(title, tfidf_dict):
     wordcloud = WordCloud(
