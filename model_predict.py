@@ -3,7 +3,7 @@ import argparse
 import os
 import sys
 # import timm
-from datasets import load_from_disk
+from datasets import load_from_disk,concatenate_datasets
 
 # load tqdm
 from tqdm import tqdm
@@ -21,6 +21,7 @@ def parse_command_line():
 def make_predictions(model, tokenizer, test_data, batch_size, device):
         number_of_examples = len(test_data["tokens"])
         predictions = []
+        pred_to_spacy_token_idx=[]
 
         # Initialize tqdm to track progress
         with tqdm(total=number_of_examples) as pbar:
@@ -34,8 +35,13 @@ def make_predictions(model, tokenizer, test_data, batch_size, device):
                     is_split_into_words=True,
                     max_length=model.config.max_position_embeddings,
                     return_tensors="pt",
+                    return_offsets_mapping = False
                 )
                 batch_input.to(device)
+                # make mapping from toknized input to orginal tokens
+                pred_to_spacy_token_idx_temp = [batch_input[i].word_ids for i in range(len(batch_input["input_ids"]))]
+                pred_to_spacy_token_idx.extend(pred_to_spacy_token_idx_temp)
+                
                 # Perform operations within no_grad() context
                 with torch.no_grad():
                     # Perform predictions
@@ -50,7 +56,7 @@ def make_predictions(model, tokenizer, test_data, batch_size, device):
                 predictions.extend(batch_predicted_token_class)
                 # Update tqdm progress bar
                 pbar.update(len(batch_input["input_ids"]))
-        return predictions
+        return predictions, pred_to_spacy_token_idx
 
 if __name__ == "__main__":
     if torch.cuda.is_available():
@@ -97,13 +103,19 @@ if __name__ == "__main__":
     test_data = data_dict["test"]
     # make predictions in batches           
     
-    predictions_test = make_predictions(model, tokenizer, test_data, batch_size, device)
+    predictions_test, pred_to_spacy_token_idx_test = make_predictions(model, tokenizer, test_data, batch_size, device)
     test_data = test_data.add_column("predicted_labels", predictions_test)
+    test_data = test_data.add_column("pred_to_spacy_token_idx", pred_to_spacy_token_idx_test)
     # save the updated data_dict to the disk
     test_data.save_to_disk(os.path.join(model_folder, "predictions_test"))
     # also make predictions on the validation data
     val_data = data_dict["validation"]
-    predictions_val = make_predictions(model, tokenizer, val_data, batch_size, device)
+    predictions_val, pred_to_spacy_token_idx_val = make_predictions(model, tokenizer, val_data, batch_size, device)
     val_data = val_data.add_column("predicted_labels", predictions_val)
+    val_data = val_data.add_column("pred_to_spacy_token_idx", pred_to_spacy_token_idx_val)
     # save the updated data_dict to the disk
     val_data.save_to_disk(os.path.join(model_folder, "predictions_validation"))
+
+    #also save version thats the concatenation of the test and validation data
+    eval_test_conc = concatenate_datasets([test_data, val_data])
+    eval_test_conc.save_to_disk(os.path.join(model_folder, "predictions_eval_test_conc"))
