@@ -171,5 +171,7 @@ test_data/
 trained_model_cased/
 trained_model_uncased/
 combined_data.json
+HPC/
+notebook_model/
 
 ```
