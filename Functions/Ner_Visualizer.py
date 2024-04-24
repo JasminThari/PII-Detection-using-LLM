@@ -30,7 +30,8 @@ def convert_to_spacy_format(text, tokens, labels, trailing_whitespace):
     
     for i, (token, label, space) in enumerate(zip(tokens, labels, trailing_whitespace)):
         if label.startswith('B-') or label.startswith('I-'):
-            label_type = label[2:]  # Extract entity type from label
+            #label_type = label[2:]  # Extract entity type from label
+            label_type = label
             token_start = text.find(token, start)  # Find the start index of the token in text
             token_end = token_start + len(token)  # Calculate the end index of the token
             
@@ -90,7 +91,7 @@ def visualize_ner(row):
                 </style>
                 """
 
-    options = {"colors": {"B-NAME": "#748CAB", "URL_PERSONAL": "#FFFC31", "ID_NUM": "#E94F37", "B-EMAIL": "#F8B195", "I-EMAIL": "#F8B195", "B-STREET_ADDRESS": "#BDBF09", "I-STREET_ADDRESS": "#CDADE6", "B-PHONE_NUM": "#BD8A3D",
+    options = {"colors": {"B-NAME": "#748CAB", "I-NAME": "#527184", "URL_PERSONAL": "#FFFC31", "ID_NUM": "#E94F37", "B-EMAIL": "#F8B195", "I-EMAIL": "#F8B195", "B-STREET_ADDRESS": "#BDBF09", "I-STREET_ADDRESS": "#CDADE6", "B-PHONE_NUM": "#BD8A3D",
                            "I-PHONE_NUM": "#D96C06", "USERNAME": "#2292A4"}}
 
     # Inject custom CSS
